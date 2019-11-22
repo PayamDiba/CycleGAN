@@ -7,6 +7,7 @@ import torchvision.datasets.utils as utils
 from zipfile import ZipFile
 import shutil
 import torchvision.transforms as transforms
+from torchvision import datasets
 import torchvision
 import torch
 
@@ -33,8 +34,8 @@ class buildDataLoader(object):
             self._download(path_data)
             self._unzip(path_data + '/' + self.name_ + '.zip', path_data)
             self._orginize_folders(path_data + '/' + self.name_)
-            self.data_path_ = path_data + '/' + self.name_
 
+        self.data_path_ = path_data + '/' + self.name_
 
     def _check_exists(self, path):
         currPath = path+ '/' + self.name_
@@ -65,7 +66,7 @@ class buildDataLoader(object):
                     shutil.copy(currPath + '/' + src, currPath + '/1')
                     os.remove(currPath + '/' + src)
 
-    def getDataLoader_train(batch_size, transform = None, nWorkers = 1):
+    def getDataLoader_train(self, batch_size, transform = None, nWorkers = 1):
         """returns pytorch dataloader with the specified batch size, transformation and thread
 
         transformation: a torchvision transformation, if None only tensor conversion is applied
@@ -75,10 +76,28 @@ class buildDataLoader(object):
             transform = transforms.Compose([
             transforms.ToTensor(),
             ])
-        datasetA = datasets.ImageFolder(self.data_path_ + '/trainA/, transform = transform)
-        datasetB = datasets.ImageFolder(self.data_path_ + '/trainB/, transform = transform)
+        datasetA = datasets.ImageFolder(self.data_path_ + '/trainA/', transform = transform)
+        datasetB = datasets.ImageFolder(self.data_path_ + '/trainB/', transform = transform)
 
         trainLoaderA = torch.utils.data.DataLoader(datasetA, batch_size = batch_size, shuffle = True, num_workers = nWorkers)
         trainLoaderB = torch.utils.data.DataLoader(datasetB, batch_size = batch_size, shuffle = True, num_workers = nWorkers)
 
         return trainLoaderA, trainLoaderB
+
+    def getDataLoader_test(self, batch_size, transform = None, nWorkers = 1):
+        """returns pytorch dataloader with the specified batch size, transformation and thread
+
+        transformation: a torchvision transformation, if None only tensor conversion is applied
+        #TODO: make sure if in cycleGAN paper any transformation such as normalization was used
+        """
+        if not transform:
+            transform = transforms.Compose([
+            transforms.ToTensor(),
+            ])
+        datasetA = datasets.ImageFolder(self.data_path_ + '/testA/', transform = transform)
+        datasetB = datasets.ImageFolder(self.data_path_ + '/testB/', transform = transform)
+
+        testLoaderA = torch.utils.data.DataLoader(datasetA, batch_size = batch_size, shuffle = True, num_workers = nWorkers)
+        testLoaderB = torch.utils.data.DataLoader(datasetB, batch_size = batch_size, shuffle = True, num_workers = nWorkers)
+
+        return testLoaderA, testLoaderB
