@@ -59,3 +59,25 @@ def calculate_lr(initial_lr, steps_constant, steps_decay, total_steps, currEpoch
     c = np.true_divide(a,b)
 
     return (1-c) * initial_lr
+
+def make_dir(flags):
+    """
+    Creates the given directory if does not already exists
+    """
+    path_data = flags.data_dir
+    path_model = flags.checkpoint_dir
+    path_images = flags.image_dir
+
+    if os.path.exists(path_data) and os.path.exists(path_model) and os.path.exists(path_images):
+        raise RuntimeError('All of the given directories already exist. It will over-write the results. Please take backup and delete the existing models and images directories or move to a new directory and try again.')
+
+    if not os.path.exists(path_data):
+        os.mkdir(path_data)
+
+    if not os.path.exists(path_model):
+        os.mkdir(path_data)
+
+    if not os.path.exists(path_images):
+        os.mkdir(path_images)
+        os.mkdir(path_images + '/train')
+        os.mkdir(path_images + '/test')

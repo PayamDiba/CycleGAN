@@ -95,6 +95,7 @@ class buildDataLoader(object):
             transform = transforms.Compose([
             transforms.ToTensor(),
             ])
+
         datasetA = datasets.ImageFolder(self.data_path_ + '/testA/', transform = transform)
         datasetB = datasets.ImageFolder(self.data_path_ + '/testB/', transform = transform)
 
@@ -114,7 +115,36 @@ class buildDataLoader(object):
         self._sample_data(nSamples, 'trainA', indices = indices)
         self._sample_data(nSamples, 'trainB', indices = indices)
         self._sample_data(nSamples, 'testA', indices = indices)
-        self._sample_data(nSamples, 'testB', indices = indices)     
+        self._sample_data(nSamples, 'testB', indices = indices)
+
+    def getDataLoader_samples(self, transform_train = None, transform_test = None, nWorkers = 1):
+        """returns pytorch dataloader for the sampled data.
+
+        transformation: a torchvision transformation, if None only tensor conversion is applied
+        #TODO: make sure if in cycleGAN paper any transformation such as normalization was used
+        """
+        if not transform_train:
+            transform_train = transforms.Compose([
+            transforms.ToTensor(),
+            ])
+
+        if not transform_test:
+            transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            ])
+
+
+        datasetA_train = datasets.ImageFolder(self.data_path_ + '/sample_trainA/', transform = transform_train)
+        datasetA_test = datasets.ImageFolder(self.data_path_ + '/sample_testA/', transform = transform_test)
+        datasetB_train = datasets.ImageFolder(self.data_path_ + '/sample_trainB/', transform = transform_train)
+        datasetB_test = datasets.ImageFolder(self.data_path_ + '/sample_testB/', transform = transform_test)
+
+        trainLoaderA = torch.utils.data.DataLoader(datasetA_train, batch_size = len(datasetA_train), shuffle = False, num_workers = nWorkers)
+        testLoaderA = torch.utils.data.DataLoader(datasetA_test, batch_size = len(datasetA_test), shuffle = False, num_workers = nWorkers)
+        trainLoaderB = torch.utils.data.DataLoader(datasetB_train, batch_size = len(datasetB_train), shuffle = False, num_workers = nWorkers)
+        testLoaderB = torch.utils.data.DataLoader(datasetB_test, batch_size = len(datasetB_test), shuffle = False, num_workers = nWorkers)
+
+        return trainLoaderA, trainLoaderB, testLoaderA, testLoaderB
 
     def _sample_data(self, nSamples, folder_name, indices = None):
         """helper function for sampling some data from the given folder name (e.g. trainA)

@@ -140,7 +140,7 @@ class cycleGAN(object):
         lambdaA = self.flags_.l_A
         lambdaB = self.flags_.l_B
         lambdaIdnt = self.flags_.l_idnt
-        if not self.flags_.ganLossType_ == 'was':
+        if not self.ganLossType_ == 'was':
             # GAN and identity loss for gA
             self.loss_gan_gA, self.loss_idnt_gA, self.idntA = self._gan_idnt_lossG(self.dA, self.gA, self.realB, self.fakeB)
             self.loss_idnt_gA *= lambdaB * lambdaIdnt
@@ -168,10 +168,16 @@ class cycleGAN(object):
         Runs forward pass, then optimizes generators and updates their parameters,
         then optimizes discriminators and updates their parameters.
         """
+        A,B = input
+        A = A.to(self.device_)
+        B = B.to(self.device_)
+        input = (A,B)
+
         self.gA.train()
         self.gB.train()
         self.dA.train()
         self.dB.train()
+
 
         self.forward(input)
         for param in self.dA.parameters():
@@ -216,8 +222,8 @@ class cycleGAN(object):
         self.dB.load_state_dict(checkpoint['dB_state_dict'])
         self.optimizerG.load_state_dict(checkpoint['optimizerG_state_dict'])
         self.optimizerD.load_state_dict(checkpoint['optimizerD_state_dict'])
-        self.buffer_fakeA = load_state_dict(checkpoint['buffer_fakeA'])
-        self.buffer_fakeB = load_state_dict(checkpoint['buffer_fakeB'])
+        self.buffer_fakeA = checkpoint['buffer_fakeA']
+        self.buffer_fakeB = checkpoint['buffer_fakeB']
 
         return checkpoint['epoch']
 
@@ -232,6 +238,8 @@ class cycleGAN(object):
 
         #DEBUG: make sure this scaling and our plot function does not cause any problem
         """
+        imagesA = imagesA.to(self.device_)
+        imagesB = imagesB.to(self.device_)
 
         with torch.no_grad():
             self.gA.eval()
