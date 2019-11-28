@@ -8,6 +8,8 @@ from generator import generator
 from discriminator import discriminator
 from buffer import buffer
 import itertools
+from utils import plot
+import matplotlib.pyplot as plt
 
 
 
@@ -41,7 +43,7 @@ class cycleGAN(object):
 
         self.buffer_fakeA = buffer()
         self.buffer_fakeB = buffer()
-        #TODO define scheduleler
+
         #TODO 'was' mode of gan loss needs implementation of gradient penalty as well
 
         if self.ganLossType_ == 'lse': #Least square loss
@@ -159,12 +161,18 @@ class cycleGAN(object):
         self.loss_cycle_back = self.cycleCriterion(self.recycledB, self.realB) * lambdaB
 
         self.lossG = self.loss_gan_gA + self.loss_gan_gB + self.loss_idnt_gA + self.loss_idnt_gB + self.loss_cycle_forw + self.loss_cycle_back
+        self.lossG.backward()
 
     def update_optimizer(self, input):
         """
         Runs forward pass, then optimizes generators and updates their parameters,
         then optimizes discriminators and updates their parameters.
         """
+        self.gA.train()
+        self.gB.train()
+        self.dA.train()
+        self.dB.train()
+
         self.forward(input)
         for param in self.dA.parameters():
             param.requires_grad = False
@@ -184,4 +192,92 @@ class cycleGAN(object):
         self.backwardD()
         self.optimizerD.step()
 
-    # TODO: 1- add scheduleler 2- add BW specific command for ADAM opt 3- add evaluation functionality
+    def save(self, path, epoch):
+        """
+        path e.g. /saved_models/
+        """
+        torch.save({
+            'epoch': epoch,
+            'gA_state_dict': self.gA.state_dict(),
+            'gB_state_dict': self.gB.state_dict(),
+            'dA_state_dict': self.dA.state_dict(),
+            'dB_state_dict': self.dB.state_dict(),
+            'optimizerG_state_dict': self.optimizerG.state_dict(),
+            'optimizerD_state_dict': self.optimizerD.state_dict(),
+            'buffer_fakeA': self.buffer_fakeA,
+            'buffer_fakeB': self.buffer_fakeB,
+            }, path + '/checkpoint_' + str(epoch) + '.tar')
+
+    def load(self, path):
+        checkpoint = torch.load(path)
+        self.gA.load_state_dict(checkpoint['gA_state_dict'])
+        self.gB.load_state_dict(checkpoint['gB_state_dict'])
+        self.dA.load_state_dict(checkpoint['dA_state_dict'])
+        self.dB.load_state_dict(checkpoint['dB_state_dict'])
+        self.optimizerG.load_state_dict(checkpoint['optimizerG_state_dict'])
+        self.optimizerD.load_state_dict(checkpoint['optimizerD_state_dict'])
+        self.buffer_fakeA = load_state_dict(checkpoint['buffer_fakeA'])
+        self.buffer_fakeB = load_state_dict(checkpoint['buffer_fakeB'])
+
+        return checkpoint['epoch']
+
+    def evaluate(self, imagesA, imagesB, path_write, epoch):
+        """
+        Samples from the generator are scaled between -1 and 1.
+        The plot function expects them to be scaled between 0 and 1 and also
+        expects the order of the channels to be (batch_size,w,h,3) as opposed to
+        how PyTorch expects it.
+
+        path_write e.g. /generated_images/train/ or /generated_images/test/
+
+        #DEBUG: make sure this scaling and our plot function does not cause any problem
+        """
+
+        with torch.no_grad():
+            self.gA.eval()
+            self.gB.eval()
+            fakesB = self.gA(imagesA)
+            fakesA = self.gB(imagesB)
+
+            fakesB = fakesB.data.cpu().numpy()
+            fakesA = fakesA.data.cpu().numpy()
+            fakesB += 1
+            fakesB /= 2.0
+            fakesA += 1
+            fakesA /= 2.0
+            fakesB = fakesB.transpose(0,2,3,1)
+            fakesA = fakesA.transpose(0,2,3,1)
+
+            fig_fakesA = plot(fakesA)
+            plt.savefig(path_write + '/fakeA_' + str(epoch), bbox_inches='tight')
+            plt.close(fig_fakesA)
+
+            fig_fakesB = plot(fakesB)
+            plt.savefig(path_write + '/fakeB_' + str(epoch), bbox_inches='tight')
+            plt.close(fig_fakesB)
+
+    def update_lr(self, newLR_G, newLR_D):
+        """
+        Updates the learn rate for generator and discriminator optimizers
+        """
+        for param_group in self.optimizerG.param_groups:
+            param_group['lr'] = newLR_G
+
+        for param_group in self.optimizerD.param_groups:
+            param_group['lr'] = newLR_D
+
+    def print_loss(self, epoch):
+        """
+        prints the values of all 8 losses in the following order:
+        epoch, loss_dA, loss_dB, loss_gan_gA, loss_gan_gB, loss_cycle_forw, loss_cycle_back, loss_idnt_gA, loss_idnt_gB
+        """
+        print(epoch, "%.3f" % self.loss_dA,
+                        "%.3f" % self.loss_dB,
+                        "%.3f" % self.loss_gan_gA,
+                        "%.3f" % self.loss_gan_gB,
+                        "%.3f" % self.loss_cycle_forw,
+                        "%.3f" % self.loss_cycle_back,
+                        "%.3f" % self.loss_idnt_gA,
+                        "%.3f" % self.loss_idnt_gB)
+
+    # TODO: 1- add BW specific command for ADAM opt

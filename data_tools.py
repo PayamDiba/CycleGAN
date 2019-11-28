@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 from torchvision import datasets
 import torchvision
 import torch
+import numpy as np
 
 class buildDataLoader(object):
     """
@@ -97,7 +98,51 @@ class buildDataLoader(object):
         datasetA = datasets.ImageFolder(self.data_path_ + '/testA/', transform = transform)
         datasetB = datasets.ImageFolder(self.data_path_ + '/testB/', transform = transform)
 
-        testLoaderA = torch.utils.data.DataLoader(datasetA, batch_size = batch_size, shuffle = True, num_workers = nWorkers)
-        testLoaderB = torch.utils.data.DataLoader(datasetB, batch_size = batch_size, shuffle = True, num_workers = nWorkers)
+        testLoaderA = torch.utils.data.DataLoader(datasetA, batch_size = batch_size, shuffle = False, num_workers = nWorkers)
+        testLoaderB = torch.utils.data.DataLoader(datasetB, batch_size = batch_size, shuffle = False, num_workers = nWorkers)
 
         return testLoaderA, testLoaderB
+
+    def sampleData(self, nSamples, indices = None):
+        """samples some data from all four datasets (trainA, testA, trainB, testB)
+        that will be used for evaluation during training
+
+        indices: if given, they used for  sampling else randpm indices are generated.
+        Indices refers to indices when os.listdir() is used
+        """
+
+        self._sample_data(nSamples, 'trainA', indices = indices)
+        self._sample_data(nSamples, 'trainB', indices = indices)
+        self._sample_data(nSamples, 'testA', indices = indices)
+        self._sample_data(nSamples, 'testB', indices = indices)     
+
+    def _sample_data(self, nSamples, folder_name, indices = None):
+        """helper function for sampling some data from the given folder name (e.g. trainA)
+        that will be used for evaluation during training
+
+        indices: if given, they used for  sampling else randpm indices are generated.
+        Indices refers to indices when os.listdir() is used
+        """
+        path = self.data_path_ + '/sample_' + folder_name
+        if not os.path.exists(path):
+            os.mkdir(path)
+            os.mkdir(path + '/1')
+        else:
+            shutil.rmtree(path + '/1')
+            os.mkdir(path + '/1')
+
+        originalPath = self.data_path_ + '/' + folder_name + '/1'
+        allImages =  os.listdir(originalPath)
+        try:
+            allImages.remove('.DS_Store')
+        except:
+            pass
+
+
+        if not indices:
+            indices = np.random.randint(0, len(allImages), nSamples)
+        fnames = np.take(allImages, indices)
+        for f in fnames:
+            src = originalPath + '/' + f
+            dst = self.data_path_ + '/sample_' + folder_name + '/1'
+            shutil.copy(src, dst)
