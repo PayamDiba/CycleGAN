@@ -42,7 +42,7 @@ flags.DEFINE_integer('steps_constLR', 100, 'Number of the intial training steps 
 def main(argv):
 
     if not FLAGS.resume:
-        make_dir(flags)
+        make_dir(FLAGS)
     else:
         if not FLAGS.last_epoch:
             raise RuntimeError('Specify the checkpoint from which you want to resume training')
@@ -121,5 +121,5 @@ def main(argv):
         """
         Update learning rate
         """
-        newLR = calculate_lr(FLAGS.lr, FLAGS.steps_constLR, FLAGS.nEpoch - FLAGS.steps_constLR, self.nEpoch, epoch)
+        newLR = calculate_lr(FLAGS.lr, FLAGS.steps_constLR, FLAGS.nEpoch - FLAGS.steps_constLR, FLAGS.nEpoch, epoch)
         model.update_lr(newLR_G = newLR, newLR_D = newLR)
