@@ -19,7 +19,7 @@ def plot(samples):
     """
     #DEBUG: the below command might raise error, not sure if samples is going
     # to be a tensor or list of tensors or array! For now assume it is tensor
-    nImages = samples.size()[0]
+    nImages = np.shape(samples)[0]
     assert(nImages <= 25)
 
     fig = plt.figure(figsize=(10, 10))
@@ -52,7 +52,7 @@ def calculate_lr(initial_lr, steps_constant, steps_decay, total_steps, currEpoch
     Note that LR for epoch 100 is determined when currEpoch = 99
     Usage at epoch 10: calculate_lr(0.001, 100, 100, 200, 10)
     """
-    assert(steps_constant + steps_decay = total_steps)
+    assert(steps_constant + steps_decay == total_steps)
 
     a = max(0, currEpoch - (steps_constant - 2))
     b = float(steps_decay) + 1.0
@@ -75,7 +75,7 @@ def make_dir(flags):
         os.mkdir(path_data)
 
     if not os.path.exists(path_model):
-        os.mkdir(path_data)
+        os.mkdir(path_model)
 
     if not os.path.exists(path_images):
         os.mkdir(path_images)

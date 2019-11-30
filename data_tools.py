@@ -44,7 +44,7 @@ class buildDataLoader(object):
 
     def _download(self, path_download):
         url = self.url_dict_[self.name_]
-        utils.download_url(url, root=path_download)
+        utils.download_url(url, root=path_download, filename = self.name_ + '.zip', md5 = None)
 
     def _unzip(self, path_zip, path_extract):
         with ZipFile(path_zip, 'r') as zipObj:

@@ -23,6 +23,17 @@ class cycleGAN(object):
 
     def __init__(self, flags):
 
+        self.nIter_ = 0
+        self.avgLoss = {
+            'dA' : 0,
+            'dB' : 0,
+            'gan_gA' : 0,
+            'gan_gB' : 0,
+            'cycle_forw' : 0,
+            'cycle_back' : 0,
+            'idnt_gA' : 0,
+            'idnt_gB' : 0,
+        }
         self.flags_ = flags
         self.device_ = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.ganLossType_ = flags.glt
@@ -66,8 +77,8 @@ class cycleGAN(object):
 
         input: a tuple of tensors (A,B)
         """
-        self.realA = input[0].to(self.device_)
-        self.realB = input[1].to(self.device_)
+        self.realA = input[0]
+        self.realB = input[1]
         self.fakeB = self.gA(self.realA)
         self.fakeA = self.gB(self.realB)
         self.recycledA = self.gB(self.fakeB)
@@ -82,11 +93,13 @@ class cycleGAN(object):
         fakeImage: the output of generator (either gA, or gB)
         """
         predReal = disc(realImage)
-        targetReal = torch.tensor(True).expand_as(predReal)
+        targetReal = torch.tensor(1.0).expand_as(predReal)
+        targetReal = targetReal.to(self.device_)
         lossReal = self.ganCriterion(predReal, targetReal)
 
-        predFake = disc(fakeImage)
-        targetFake = torch.tensor(False).expand_as(predFake)
+        predFake = disc(fakeImage.detach())
+        targetFake = torch.tensor(0.0).expand_as(predFake)
+        targetFake = targetFake.to(self.device_)
         lossFake = self.ganCriterion(predFake, targetFake)
 
         loss = 0.5 * (lossReal + lossFake) # don't do backward here
@@ -105,7 +118,8 @@ class cycleGAN(object):
         """
         # calculate GAN loss
         pred = disc(fakeImage)
-        target = torch.tensor(True).expand_as(pred)
+        target = torch.tensor(1.0).expand_as(pred)
+        target = target.to(self.device_)
         lossGAN = self.ganCriterion(pred, target)
 
         # calculate identity loss
@@ -123,11 +137,13 @@ class cycleGAN(object):
         """
         # loss and backward for dA
         fakeB = self.buffer_fakeB.getImages(self.fakeB)
+        fakeB = fakeB.to(self.device_)
         self.loss_dA = self._gan_lossD(self.dA, self.realB, fakeB)
         #self.loss_dA.backward()
 
         # backward for dB
         fakeA = self.buffer_fakeA.getImages(self.fakeA)
+        fakeA = fakeA.to(self.device_)
         self.loss_dB = self._gan_lossD(self.dB, self.realA, fakeA)
         #self.loss_dB.backward()
         self.lossD = self.loss_dA + self.loss_dB
@@ -198,6 +214,8 @@ class cycleGAN(object):
         self.backwardD()
         self.optimizerD.step()
 
+        self.nIter_ += 1
+        self._update_loss_dict()
     def save(self, path, epoch):
         """
         path e.g. /saved_models/
@@ -212,6 +230,8 @@ class cycleGAN(object):
             'optimizerD_state_dict': self.optimizerD.state_dict(),
             'buffer_fakeA': self.buffer_fakeA,
             'buffer_fakeB': self.buffer_fakeB,
+            'nIter': self.nIter_,
+            'loss_dict': self.avgLoss,
             }, path + '/checkpoint_' + str(epoch) + '.tar')
 
     def load(self, path):
@@ -224,6 +244,8 @@ class cycleGAN(object):
         self.optimizerD.load_state_dict(checkpoint['optimizerD_state_dict'])
         self.buffer_fakeA = checkpoint['buffer_fakeA']
         self.buffer_fakeB = checkpoint['buffer_fakeB']
+        self.nIter = checkpoint['nIter']
+        self.avgLoss = checkpoint['loss_dict']
 
         return checkpoint['epoch']
 
@@ -279,13 +301,24 @@ class cycleGAN(object):
         prints the values of all 8 losses in the following order:
         epoch, loss_dA, loss_dB, loss_gan_gA, loss_gan_gB, loss_cycle_forw, loss_cycle_back, loss_idnt_gA, loss_idnt_gB
         """
-        print(epoch, "%.3f" % self.loss_dA,
-                        "%.3f" % self.loss_dB,
-                        "%.3f" % self.loss_gan_gA,
-                        "%.3f" % self.loss_gan_gB,
-                        "%.3f" % self.loss_cycle_forw,
-                        "%.3f" % self.loss_cycle_back,
-                        "%.3f" % self.loss_idnt_gA,
-                        "%.3f" % self.loss_idnt_gB)
+        print(epoch, "%.3f" % self.avgLoss['dA'],
+                        "%.3f" % self.avgLoss['dB'],
+                        "%.3f" % self.avgLoss['gan_gA'],
+                        "%.3f" % self.avgLoss['gan_gB'],
+                        "%.3f" % self.avgLoss['cycle_forw'],
+                        "%.3f" % self.avgLoss['cycle_back'],
+                        "%.3f" % self.avgLoss['idnt_gA'],
+                        "%.3f" % self.avgLoss['idnt_gB'])
+
+    def _update_loss_dict(self):
+        N = self.nIter_
+        self.avgLoss['dA'] = ((N-1) * self.avgLoss['dA'] + self.loss_dA)/N
+        self.avgLoss['dB'] = ((N-1) * self.avgLoss['dB'] + self.loss_dB)/N
+        self.avgLoss['gan_gA'] = ((N-1) * self.avgLoss['gan_gA'] + self.loss_gan_gA)/N
+        self.avgLoss['gan_gB'] = ((N-1) * self.avgLoss['gan_gB'] + self.loss_gan_gB)/N
+        self.avgLoss['cycle_forw'] = ((N-1) * self.avgLoss['cycle_forw'] + self.loss_cycle_forw)/N
+        self.avgLoss['cycle_back'] = ((N-1) * self.avgLoss['cycle_back'] + self.loss_cycle_back)/N
+        self.avgLoss['idnt_gA'] = ((N-1) * self.avgLoss['idnt_gA'] + self.loss_idnt_gA)/N
+        self.avgLoss['idnt_gB'] = ((N-1) * self.avgLoss['idnt_gB'] + self.loss_idnt_gB)/N
 
     # TODO: 1- add BW specific command for ADAM opt

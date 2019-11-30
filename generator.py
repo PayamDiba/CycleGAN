@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 from collections import OrderedDict
-from ResNetBlock import ResNetBlock
+from ResidualBlock import ResNetBlock
 
 
 class generator(nn.Module):

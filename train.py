@@ -44,7 +44,7 @@ def main(argv):
     if not FLAGS.resume:
         make_dir(FLAGS)
     else:
-        if not FLAGS.last_epoch:
+        if FLAGS.last_epoch == None:
             raise RuntimeError('Specify the checkpoint from which you want to resume training')
         else:
             path_checkpoint = FLAGS.checkpoint_dir + '/checkpoint_' + str(FLAGS.last_epoch) + '.tar'
@@ -53,7 +53,8 @@ def main(argv):
     Prepare data
     """
     data = buildDataLoader(FLAGS.ds, FLAGS.data_dir)
-    data.sampleData(FLAGS.nSamples, indices = None)
+    if not FLAGS.resume:
+        data.sampleData(FLAGS.nSamples, indices = None)
 
     #TODO take care of transformation
 
@@ -73,9 +74,8 @@ def main(argv):
     model = cycleGAN(FLAGS)
     if FLAGS.resume:
         last_epoch = model.load(path_checkpoint)
-
-    if not last_epoch == FLAGS.last_epoch:
-        raise RuntimeError('DEBUG: Inconsistency between the saved last epoch and specified last epoch')
+        if not last_epoch == FLAGS.last_epoch:
+            raise RuntimeError('DEBUG: Inconsistency between the saved last epoch and specified last epoch')
 
     """
     Training
@@ -99,10 +99,13 @@ def main(argv):
 
         #NOTE: I think iterator on dataloader by default returns a list where first element is data and second is its label
         # but here we don't have label, therefore we only need the first element, so index '0' was used
+        batchID = 1
         for A, B in zip(trainLoaderA, trainLoaderB):
             input = (A[0],B[0])
             model.update_optimizer(input)
-            model.print_loss(epoch)
+            if batchID % 100 == 0:
+                model.print_loss(epoch)
+            batchID += 1
 
         """
         Save and Evaluation
@@ -111,11 +114,11 @@ def main(argv):
             model.save(FLAGS.checkpoint_dir, epoch)
 
             for sampledA, sampledB in zip(trainA_samples, trainB_samples):
-                path_write = flags.image_dir + '/train'
+                path_write = FLAGS.image_dir + '/train'
                 model.evaluate(sampledA[0], sampledB[0], path_write, epoch)
 
             for sampledA, sampledB in zip(testA_samples, testB_samples):
-                path_write = flags.image_dir + '/test'
+                path_write = FLAGS.image_dir + '/test'
                 model.evaluate(sampledA[0], sampledB[0], path_write, epoch)
 
         """
@@ -123,3 +126,6 @@ def main(argv):
         """
         newLR = calculate_lr(FLAGS.lr, FLAGS.steps_constLR, FLAGS.nEpoch - FLAGS.steps_constLR, FLAGS.nEpoch, epoch)
         model.update_lr(newLR_G = newLR, newLR_D = newLR)
+
+if __name__ == "__main__":
+    app.run(main)
