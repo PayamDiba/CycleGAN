@@ -30,6 +30,12 @@ class buildDataLoader(object):
             'horse2zebra':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/horse2zebra.zip',
             'apple2orange':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/apple2orange.zip',
             'summer2winter_yosemite':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/summer2winter_yosemite.zip',
+            'maps':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/maps.zip',
+            'cezanne2photo':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/cezanne2photo.zip',
+            'monet2photo':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/monet2photo.zip',
+            'ukiyoe2photo':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/ukiyoe2photo.zip',
+            'vangogh2photo':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/vangogh2photo.zip',
+            'iphone2dslr_flower':'https://people.eecs.berkeley.edu/~taesung_park/CycleGAN/datasets/iphone2dslr_flower.zip',
         }
         if not self._check_exists(path_data):
             self._download(path_data)

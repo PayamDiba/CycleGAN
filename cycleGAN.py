@@ -8,7 +8,7 @@ from generator import generator
 from discriminator import discriminator
 from buffer import buffer
 import itertools
-from utils import plot
+from utils import plot, init_weights
 import matplotlib.pyplot as plt
 
 
@@ -51,6 +51,11 @@ class cycleGAN(object):
         self.gB.to(self.device_)
         self.dA.to(self.device_)
         self.dB.to(self.device_)
+
+        init_weights(self.gA, flags.init_type, flags.init_scale)
+        init_weights(self.gB, flags.init_type, flags.init_scale)
+        init_weights(self.dA, flags.init_type, flags.init_scale)
+        init_weights(self.dB, flags.init_type, flags.init_scale)
 
         self.buffer_fakeA = buffer()
         self.buffer_fakeB = buffer()
@@ -244,7 +249,7 @@ class cycleGAN(object):
         self.optimizerD.load_state_dict(checkpoint['optimizerD_state_dict'])
         self.buffer_fakeA = checkpoint['buffer_fakeA']
         self.buffer_fakeB = checkpoint['buffer_fakeB']
-        self.nIter = checkpoint['nIter']
+        self.nIter_ = checkpoint['nIter']
         self.avgLoss = checkpoint['loss_dict']
 
         return checkpoint['epoch']

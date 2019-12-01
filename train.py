@@ -35,8 +35,8 @@ flags.DEFINE_boolean('resume', False, 'Whether we are resuming training from a c
 flags.DEFINE_integer('last_epoch', None, 'Need to be specified if resuming from a checkpoint to determine the epoch from which training is continued. It is used to read the saved checkpoint')
 flags.DEFINE_integer('freq', 5, 'Epoch frequency for saving model and evaluation on sampled images')
 flags.DEFINE_integer('steps_constLR', 100, 'Number of the intial training steps (epochs) over which learning rate is constant')
-
-
+flags.DEFINE_string('init_type', 'normal', 'The type of free parameters initilizer: normal, xavier_normal')
+flags.DEFINE_float('init_scale', 0.02, 'Scale/gain that is used in free parameters initilizer')
 
 
 def main(argv):

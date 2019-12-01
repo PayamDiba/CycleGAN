@@ -81,3 +81,27 @@ def make_dir(flags):
         os.mkdir(path_images)
         os.mkdir(path_images + '/train')
         os.mkdir(path_images + '/test')
+
+def init_weights(model, type = 'normal', scale = 0.02):
+    """
+    Initializes the neural network weights.
+    The function was taken from :
+    https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
+    """
+    def initilizer(m):
+        classname = m.__class__.__name__
+        if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
+            if type == 'normal':
+                torch.nn.init.normal_(m.weight.data, 0.0, scale)
+            elif type == 'xavier_normal':
+                torch.nn.init.xavier_normal_(m.weight.data, gain = scale)
+            else:
+                raise NotImplementedError('initialization method [%s] is not implemented' % init_type)
+            if hasattr(m, 'bias') and m.bias is not None:
+                torch.nn.init.constant_(m.bias.data, 0.0)
+
+        elif classname.find('BatchNorm2d') != -1:  # BatchNorm Layer's weight is not a matrix; only normal distribution applies.
+            torch.nn.init.normal_(m.weight.data, 1.0, scale)
+            torch.nn.init.constant_(m.bias.data, 0.0)
+
+    model.apply(initilizer)
