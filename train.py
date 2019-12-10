@@ -17,6 +17,7 @@ flags.DEFINE_string('glt', 'lse', 'GAN loss type; the type of loss function used
 flags.DEFINE_float('l_idnt', 0.5, 'The relative weight of identity loss to cycle loss in the objective. Set to zero if there is no need to use identity loss')
 flags.DEFINE_float('l_A', 10.0, 'The relative weight of forward cycle loss to GAN loss in the objective')
 flags.DEFINE_float('l_B', 10.0, 'The relative weight of backward cycle loss to GAN loss in the objective')
+flags.DEFINE_float('l_gp', 10.0, 'The relative weight of gradient penalties to GAN loss in the objective. It is only enable when Wasserstein mode is used.')
 flags.DEFINE_integer('ncA', 3, 'Number of channels in the A domain')
 flags.DEFINE_integer('ncB', 3, 'Number of channels in the B domain')
 flags.DEFINE_integer('nbl', 9, 'Number of residual blocks in the generators')

@@ -31,6 +31,8 @@ class cycleGAN(object):
             'gan_gB' : 0,
             'cycle_forw' : 0,
             'cycle_back' : 0,
+            #'gp_dA' : 0,
+            #'gp_dB' : 0,
             'idnt_gA' : 0,
             'idnt_gB' : 0,
         }
@@ -98,14 +100,20 @@ class cycleGAN(object):
         fakeImage: the output of generator (either gA, or gB)
         """
         predReal = disc(realImage)
-        targetReal = torch.tensor(1.0).expand_as(predReal)
-        targetReal = targetReal.to(self.device_)
-        lossReal = self.ganCriterion(predReal, targetReal)
+        if self.ganLossType_ == 'was':
+            lossReal = -predReal.mean()
+        else:
+            targetReal = torch.tensor(1.0).expand_as(predReal)
+            targetReal = targetReal.to(self.device_)
+            lossReal = self.ganCriterion(predReal, targetReal)
 
         predFake = disc(fakeImage.detach())
-        targetFake = torch.tensor(0.0).expand_as(predFake)
-        targetFake = targetFake.to(self.device_)
-        lossFake = self.ganCriterion(predFake, targetFake)
+        if self.ganLossType_ == 'was':
+            lossFake = predFake.mean()
+        else:
+            targetFake = torch.tensor(0.0).expand_as(predFake)
+            targetFake = targetFake.to(self.device_)
+            lossFake = self.ganCriterion(predFake, targetFake)
 
         loss = 0.5 * (lossReal + lossFake) # don't do backward here
         return loss
@@ -123,9 +131,12 @@ class cycleGAN(object):
         """
         # calculate GAN loss
         pred = disc(fakeImage)
-        target = torch.tensor(1.0).expand_as(pred)
-        target = target.to(self.device_)
-        lossGAN = self.ganCriterion(pred, target)
+        if self.ganLossType_ == 'was':
+            lossGAN = -pred.mean()
+        else:
+            target = torch.tensor(1.0).expand_as(pred)
+            target = target.to(self.device_)
+            lossGAN = self.ganCriterion(pred, target)
 
         # calculate identity loss
         lossIdnt = 0
@@ -136,6 +147,51 @@ class cycleGAN(object):
 
         return lossGAN, lossIdnt, identity
 
+
+    def _cal_gradient_penalty(self, disc, real_data, fake_data, type = 'mixed', constant = 1.0, lambda_gp = 10.0):
+        """
+        Note: We used the implementation of "cal_gradient_penalty" that is present in the original cycleGAN code.
+        And applied minor modifications. We obtained the function from:
+        https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
+        """
+
+        """Calculate the gradient penalty loss, used in WGAN-GP paper https://arxiv.org/abs/1704.00028
+        Arguments:
+            netD (network)              -- discriminator network
+            real_data (tensor array)    -- real images
+            fake_data (tensor array)    -- generated images from the generator
+            device (str)                -- GPU / CPU: from torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')
+            type (str)                  -- if we mix real and fake data or not [real | fake | mixed].
+            constant (float)            -- the constant used in formula ( | |gradient||_2 - constant)^2
+            lambda_gp (float)           -- weight for this loss
+        Returns the gradient penalty loss
+        """
+        if lambda_gp > 0.0:
+            if type == 'real':   # either use real images, fake images, or a linear interpolation of two.
+                interpolatesv = real_data
+            elif type == 'fake':
+                interpolatesv = fake_data
+            elif type == 'mixed':
+                alpha = torch.rand(real_data.shape[0], 1)
+                alpha = alpha.expand(real_data.shape[0], real_data.nelement() // real_data.shape[0]).contiguous().view(*real_data.shape)
+                alpha = alpha.to(self.device_)
+                interpolatesv = alpha * real_data.detach() + ((1 - alpha) * fake_data.detach())
+            else:
+                raise NotImplementedError('{} not implemented'.format(type))
+
+            interpolatesv = interpolatesv.to(self.device_)
+            interpolatesv.requires_grad_(True)
+            disc_interpolates = disc(interpolatesv)
+            gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolatesv,
+                                            grad_outputs=torch.ones(disc_interpolates.size()).cuda(),
+                                            create_graph=True, retain_graph=True, only_inputs=True)[0]
+            gradients = gradients.view(gradients.size(0), -1)  # flat the data
+            gradient_penalty = (((gradients + 1e-16).norm(2, dim=1) - constant) ** 2).mean() * lambda_gp        # added eps
+            return gradient_penalty
+        else:
+            return 0.0
+
+
     def backwardD(self):
         """
         Calculates backward pass for updating discriminators (both dA and dB)
@@ -144,15 +200,27 @@ class cycleGAN(object):
         fakeB = self.buffer_fakeB.getImages(self.fakeB)
         fakeB = fakeB.to(self.device_)
         self.loss_dA = self._gan_lossD(self.dA, self.realB, fakeB)
-        #self.loss_dA.backward()
+        self.grad_penalty_dA = 0
+        if self.ganLossType_ == 'was':
+            self.grad_penalty_dA = self._cal_gradient_penalty(self.dA, self.realB, fakeB, lambda_gp = self.flags_.l_gp)
 
         # backward for dB
         fakeA = self.buffer_fakeA.getImages(self.fakeA)
         fakeA = fakeA.to(self.device_)
         self.loss_dB = self._gan_lossD(self.dB, self.realA, fakeA)
-        #self.loss_dB.backward()
+        self.grad_penalty_dB = 0
+        if self.ganLossType_ == 'was':
+            self.grad_penalty_dB = self._cal_gradient_penalty(self.dB, self.realA, fakeA, lambda_gp = self.flags_.l_gp)
+
+
         self.lossD = self.loss_dA + self.loss_dB
         self.lossD.backward()
+
+        if self.grad_penalty_dA != 0:
+            self.grad_penalty_dA.backward(retain_graph=True)
+
+        if self.grad_penalty_dB != 0:
+            self.grad_penalty_dB.backward(retain_graph=True)
 
     def backwardG(self):
         """
@@ -161,20 +229,14 @@ class cycleGAN(object):
         lambdaA = self.flags_.l_A
         lambdaB = self.flags_.l_B
         lambdaIdnt = self.flags_.l_idnt
-        if not self.ganLossType_ == 'was':
-            # GAN and identity loss for gA
-            self.loss_gan_gA, self.loss_idnt_gA, self.idntA = self._gan_idnt_lossG(self.dA, self.gA, self.realB, self.fakeB)
-            self.loss_idnt_gA *= lambdaB * lambdaIdnt
 
-            # GAN and identity loss for gB
-            self.loss_gan_gB, self.loss_idnt_gB, self.idntB = self._gan_idnt_lossG(self.dB, self.gB, self.realA, self.fakeA)
-            self.loss_idnt_gB *= lambdaA * lambdaIdnt
-        else:
-            # 'was' loss is not imlemented yet, it changes both helper backward functions
-            # cause ganCriterion is not defined anymore. Also it needs gradient penalty loss
-            # TODO: if implement Wgan, 1- modify both backward helper functions 2- move this if condition
-            # to the helper functions 3- gradient penalty
-            raise NotImplementedError('Specified gan loss has not been implemented')
+        # GAN and identity loss for gA
+        self.loss_gan_gA, self.loss_idnt_gA, self.idntA = self._gan_idnt_lossG(self.dA, self.gA, self.realB, self.fakeB)
+        self.loss_idnt_gA *= lambdaB * lambdaIdnt
+
+        # GAN and identity loss for gB
+        self.loss_gan_gB, self.loss_idnt_gB, self.idntB = self._gan_idnt_lossG(self.dB, self.gB, self.realA, self.fakeA)
+        self.loss_idnt_gB *= lambdaA * lambdaIdnt
 
         # forward cycle loss
         self.loss_cycle_forw = self.cycleCriterion(self.recycledA, self.realA) * lambdaA
@@ -312,18 +374,28 @@ class cycleGAN(object):
                         "%.3f" % self.avgLoss['gan_gB'],
                         "%.3f" % self.avgLoss['cycle_forw'],
                         "%.3f" % self.avgLoss['cycle_back'],
+                        #"%.3f" % self.avgLoss['gp_dA'],
+                        #"%.3f" % self.avgLoss['gp_dB'],
                         "%.3f" % self.avgLoss['idnt_gA'],
                         "%.3f" % self.avgLoss['idnt_gB'])
 
     def _update_loss_dict(self):
         N = self.nIter_
-        self.avgLoss['dA'] = ((N-1) * self.avgLoss['dA'] + self.loss_dA)/N
-        self.avgLoss['dB'] = ((N-1) * self.avgLoss['dB'] + self.loss_dB)/N
-        self.avgLoss['gan_gA'] = ((N-1) * self.avgLoss['gan_gA'] + self.loss_gan_gA)/N
-        self.avgLoss['gan_gB'] = ((N-1) * self.avgLoss['gan_gB'] + self.loss_gan_gB)/N
-        self.avgLoss['cycle_forw'] = ((N-1) * self.avgLoss['cycle_forw'] + self.loss_cycle_forw)/N
-        self.avgLoss['cycle_back'] = ((N-1) * self.avgLoss['cycle_back'] + self.loss_cycle_back)/N
-        self.avgLoss['idnt_gA'] = ((N-1) * self.avgLoss['idnt_gA'] + self.loss_idnt_gA)/N
-        self.avgLoss['idnt_gB'] = ((N-1) * self.avgLoss['idnt_gB'] + self.loss_idnt_gB)/N
+        self.avgLoss['dA'] = ((N-1) * self.avgLoss['dA'] + self.loss_dA.item())/N
+        self.avgLoss['dB'] = ((N-1) * self.avgLoss['dB'] + self.loss_dB.item())/N
+        self.avgLoss['gan_gA'] = ((N-1) * self.avgLoss['gan_gA'] + self.loss_gan_gA.item())/N
+        self.avgLoss['gan_gB'] = ((N-1) * self.avgLoss['gan_gB'] + self.loss_gan_gB.item())/N
+        self.avgLoss['cycle_forw'] = ((N-1) * self.avgLoss['cycle_forw'] + self.loss_cycle_forw.item())/N
+        self.avgLoss['cycle_back'] = ((N-1) * self.avgLoss['cycle_back'] + self.loss_cycle_back.item())/N
+        #self.avgLoss['gp_dA'] = ((N-1) * self.avgLoss['gp_dA'] + self.grad_penalty_dA.cpu())/N
+        #self.avgLoss['gp_dB'] = ((N-1) * self.avgLoss['gp_dB'] + self.grad_penalty_dB.cpu())/N
 
-    # TODO: 1- add BW specific command for ADAM opt
+        if self.loss_idnt_gA != 0:
+            self.avgLoss['idnt_gA'] = ((N-1) * self.avgLoss['idnt_gA'] + self.loss_idnt_gA.item())/N
+        else:
+            self.avgLoss['idnt_gA'] = 0
+
+        if self.loss_idnt_gB != 0:
+            self.avgLoss['idnt_gB'] = ((N-1) * self.avgLoss['idnt_gB'] + self.loss_idnt_gB.item())/N
+        else:
+            self.avgLoss['idnt_gB'] = 0

@@ -11,6 +11,7 @@ from torchvision import datasets
 import torchvision
 import torch
 import numpy as np
+import torch.distributed as dist
 
 class buildDataLoader(object):
     """
