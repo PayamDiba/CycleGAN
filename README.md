@@ -1,8 +1,8 @@
 # CycleGAN
-Re-implementation of the CycleGAN model proposed by Zhu et al. (See it [here](http://openaccess.thecvf.com/content_iccv_2017/html/Zhu_Unpaired_Image-To-Image_Translation_ICCV_2017_paper.html)). CycleGAN is a deep learning model for image-to-image translation in the absence of paired training data. In particular, CycleGAN learns mappings between two domains even if no supervision is available on these mappings. To this end, CycleGAN simultaneously trains and maintains four deep neural networks. Also, a new version of CycleGAN (in /CycleGAN-Sync folder) was developed that can train the model using synchronous distributed training on multiple GPUs
+Re-implementation of the CycleGAN model proposed by Zhu et al. (See it [here](http://openaccess.thecvf.com/content_iccv_2017/html/Zhu_Unpaired_Image-To-Image_Translation_ICCV_2017_paper.html)). CycleGAN is a deep learning model for image-to-image translation in the absence of paired training data. In particular, CycleGAN learns mappings between two domains even if no supervision is available on these mappings. To this end, CycleGAN simultaneously trains and maintains four deep neural networks. Also, a new version of CycleGAN (in /CycleGAN-Sync folder) was developed that can train the model using synchronous distributed training on multiple GPUs.
 
 ## Applications
-I used this model for object transfiguration (horse <-> zebra), artistic style transfer (Monet & Cezzane painting <-> real photo), and season transfer (summer <-> winter). Here are some of the results:
+I used this model for object transfiguration (horse <-> zebra), artistic style transfer (Monet & Cezzane painting <-> real photo), and season transfer (summer <-> winter). Here are some of the results (data was obtained from [here](https://people.eecs.berkeley.edu/%7Etaesung_park/CycleGAN/datasets/)):
 
 ### Horse <-> Zebra
 <p align="center"><img src="Images/h2z_train.png" width = "700" class="center"></p>
@@ -18,3 +18,5 @@ I used this model for object transfiguration (horse <-> zebra), artistic style t
 ### Summer <-> Winter
 <p align="center"><img src="Images/season_transfer_train.png" width = "700" class="center"></p>
 <p align="center"><img src="Images/season_transfer_test.png" width = "700" class="center"></p>
+
+
