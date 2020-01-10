@@ -19,4 +19,25 @@ I used this model for object transfiguration (horse <-> zebra), artistic style t
 <p align="center"><img src="Images/season_transfer_train.png" width = "700" class="center"></p>
 <p align="center"><img src="Images/season_transfer_test.png" width = "700" class="center"></p>
 
+## Train CycleGAN
+Run the following command to see a full description of the input flags:
 
+python train.py --help
+
+Example: To train a CycleGAN model on horse-to-zebra data set for 200 epochs,
+without the identity loss, and without multiprocessing in data loading, run the
+following:
+
+python train.py --l_idnt 0 --ds horse2zebra --nEpoch 200 --nw 0 > out.log
+
+Running the above command creates the following three folders:
+  1- data: contains the specified data set
+  2- models: contains the saved models during training
+  3- generated_images: contains the evaluation of model during training on 10 randomly sampled data
+
+In order to continue training from a saved model (e.g. the model saved after
+epoch 49), run the following command:
+
+python train.py --l_idnt 0 --ds horse2zebra --nEpoch 200 --nw 0 --resume True --last_epoch 49 > out.log
+
+Training will be continued while last_epoch < nEpoch.
