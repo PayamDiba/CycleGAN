@@ -10,3 +10,8 @@ I used this model for object transfiguration (horse <-> zebra), artistic style t
 <p align="center"><img src="Images/z2h_train.png" width = "700" class="center"></p>
 <p align="center"><img src="Images/z2h_test.png" width = "700" class="center"></p>
 
+### Painitng <-> Photo
+<p align="center"><img src="Images/photo2painting_train.png" width = "700" class="center"></p>
+<p align="center"><img src="Images/monet2photo_train.png" width = "700" class="center"></p>
+<p align="center"><img src="Images/artistic_style_test.png" width = "700" class="center"></p>
+
