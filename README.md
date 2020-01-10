@@ -1,3 +1,2 @@
 # CycleGAN
-An implementation for cycleGAN in PyTorch - In progress ...
-https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix
+Re-implementation of CycleGAN model proposed by Zhu et al (See it [here](http://openaccess.thecvf.com/content_iccv_2017/html/Zhu_Unpaired_Image-To-Image_Translation_ICCV_2017_paper.html)).
