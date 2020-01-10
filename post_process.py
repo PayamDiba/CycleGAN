@@ -1,5 +1,5 @@
 """
-@author: Payam Dibaeinia, and {add your names}
+@author: Payam Dibaeinia
 """
 
 import os
@@ -118,42 +118,64 @@ def main(argv):
     """
     generate fake images
     """
-    for a, b in zip(A, B):
+    cycleLoss_A = 0
+    nA = 0
+    for a in A:
+        nA += 1
         realA = a[0].cuda()
-        realB = b[0].cuda()
-
         pathA = a[2][0]
-        pathB = b[2][0]
-
         nameA = pathA.split('/')[-1]
-        nameB = pathB.split('/')[-1]
-
         nameA = nameA.split('.')[0]
-        nameB = nameB.split('.')[0]
-
 
         with torch.no_grad():
             model.gA.eval()
             model.gB.eval()
-            fakesB = model.gA(realA)
-            fakesA = model.gB(realB)
+            fakeB = model.gA(realA)
+            recycledA = model.gB(fakeB)
+            cycleLoss_A += model.cycleCriterion(realA, recycledA).item()
 
-            fakesB = fakesB.data.cpu().numpy()
-            fakesA = fakesA.data.cpu().numpy()
-            fakesB += 1
-            fakesB /= 2.0
-            fakesA += 1
-            fakesA /= 2.0
-            fakesB = fakesB.transpose(0,2,3,1)
-            fakesA = fakesA.transpose(0,2,3,1)
 
-            fig_fakesA = plot_pp(fakesA)
-            plt.savefig(FLAGS.pp_write + '/fakeA_' + nameB + '.png' , bbox_inches='tight')
-            plt.close(fig_fakesA)
+            fakeB = fakeB.data.cpu().numpy()
+            fakeB += 1
+            fakeB /= 2.0
+            fakeB = fakeB.transpose(0,2,3,1)
 
-            fig_fakesB = plot_pp(fakesB)
+            fig_fakeB = plot_pp(fakeB)
             plt.savefig(FLAGS.pp_write + '/fakeB_' + nameA + '.png' , bbox_inches='tight')
-            plt.close(fig_fakesB)
+            plt.close(fig_fakeB)
+
+    cycleLoss_A = cycleLoss_A/nA
+
+
+    cycleLoss_B = 0
+    nB = 0
+    for b in B:
+        nB += 1
+        realB = b[0].cuda()
+        pathB = b[2][0]
+        nameB = pathB.split('/')[-1]
+        nameB = nameB.split('.')[0]
+
+        with torch.no_grad():
+            model.gA.eval()
+            model.gB.eval()
+            fakeA = model.gB(realB)
+            recycledB = model.gA(fakeA)
+            cycleLoss_B += model.cycleCriterion(realB, recycledB).item()
+
+            fakeA = fakeA.data.cpu().numpy()
+            fakeA += 1
+            fakeA /= 2.0
+            fakeA = fakeA.transpose(0,2,3,1)
+
+            fig_fakeA = plot_pp(fakeA)
+            plt.savefig(FLAGS.pp_write + '/fakeA_' + nameB + '.png' , bbox_inches='tight')
+            plt.close(fig_fakeA)
+
+    cycleLoss_B = cycleLoss_B/nB
+
+    print("Forward Cycle Loss: " + str(cycleLoss_A))
+    print("Backward Cycle Loss: " + str(cycleLoss_B))
 
 if __name__ == "__main__":
     app.run(main)

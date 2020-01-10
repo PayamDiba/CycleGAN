@@ -1,5 +1,5 @@
 """
-@author: Payam Dibaeinia, and {add your names}
+@author: Payam Dibaeinia
 """
 
 import os

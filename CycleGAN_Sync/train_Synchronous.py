@@ -1,0 +1,162 @@
+"""
+@author: Payam Dibaeinia
+"""
+
+from absl import flags
+from absl import logging
+from absl import app
+from data_tools import buildDataLoader_Partitioner
+from utils import make_dir
+from cycleGAN import cycleGAN
+from utils import calculate_lr
+import torch.distributed as dist
+import os
+import subprocess
+from mpi4py import MPI
+import numpy as np
+
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string('glt', 'lse', 'GAN loss type; the type of loss function used in training: lse (Least Square Error, default), bce (Binary Cross Entropy), was (Wasserstein GAN)')
+flags.DEFINE_float('l_idnt', 0.5, 'The relative weight of identity loss to cycle loss in the objective. Set to zero if there is no need to use identity loss')
+flags.DEFINE_float('l_A', 10.0, 'The relative weight of forward cycle loss to GAN loss in the objective')
+flags.DEFINE_float('l_B', 10.0, 'The relative weight of backward cycle loss to GAN loss in the objective')
+flags.DEFINE_float('l_gp', 10.0, 'The relative weight of gradient penalties to GAN loss in the objective')
+flags.DEFINE_integer('ncA', 3, 'Number of channels in the A domain')
+flags.DEFINE_integer('ncB', 3, 'Number of channels in the B domain')
+flags.DEFINE_integer('nbl', 9, 'Number of residual blocks in the generators')
+flags.DEFINE_integer('ncFirstConv', 64, 'Number of channels in the first convolution layer of generators')
+flags.DEFINE_boolean('dropout', False, 'Whether use dropout in the residual blocks')
+flags.DEFINE_float('lr', 0.0002, 'Initial learning rate')
+flags.DEFINE_string('ds', None, 'Name of the dataset: horse2zebra, apple2orange, summer2winter_yosemite')
+flags.DEFINE_string('data_dir', 'data', 'Directory of data')
+flags.DEFINE_string('checkpoint_dir', 'models', 'Directory of saved checkpoints during training')
+flags.DEFINE_string('image_dir', 'generated_images', 'Directory of generated images during training')
+flags.DEFINE_integer('bs', 1, 'Batch size')
+flags.DEFINE_integer('nw', 2, 'Number of workers when building dataLoaders')
+flags.DEFINE_integer('nSamples', 10, 'Number of samples from train and test data to evaluate during training')
+flags.DEFINE_integer('nEpoch', 200, 'Number of total training epochs')
+flags.DEFINE_boolean('resume', False, 'Whether we are resuming training from a checkpoint')
+flags.DEFINE_integer('last_epoch', None, 'Need to be specified if resuming from a checkpoint to determine the epoch from which training is continued. It is used to read the saved checkpoint')
+flags.DEFINE_integer('freq', 5, 'Epoch frequency for saving model and evaluation on sampled images')
+flags.DEFINE_integer('steps_constLR', 100, 'Number of the intial training steps (epochs) over which learning rate is constant')
+flags.DEFINE_string('init_type', 'normal', 'The type of free parameters initilizer: normal, xavier_normal')
+flags.DEFINE_float('init_scale', 0.02, 'Scale/gain that is used in free parameters initilizer')
+
+
+def main(argv):
+    #### Initilize distributed training
+
+    cmd = "/sbin/ifconfig"
+    out, err = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE).communicate()
+    ip = str(out).split("inet addr:")[1].split()[0]
+
+    name = MPI.Get_processor_name()
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    num_nodes = int(comm.Get_size())
+
+    ip = comm.gather(ip)
+
+    if rank != 0:
+      ip = None
+
+    ip = comm.bcast(ip, root=0)
+
+    os.environ['MASTER_ADDR'] = ip[0]
+    os.environ['MASTER_PORT'] = '2222'
+
+    backend = 'mpi'
+    dist.init_process_group(backend, rank=rank, world_size=num_nodes)
+
+    dtype = torch.FloatTensor
+    #############################################
+    if not FLAGS.resume:
+        make_dir(FLAGS)
+    else:
+        if FLAGS.last_epoch == None:
+            raise RuntimeError('Specify the checkpoint from which you want to resume training')
+        else:
+            path_checkpoint = FLAGS.checkpoint_dir + '/checkpoint_' + str(FLAGS.last_epoch) + '.tar'
+
+    """
+    Prepare data
+    """
+    data = buildDataLoader_Partitioner(FLAGS.ds, FLAGS.data_dir)
+    if not FLAGS.resume:
+        data.sampleData(FLAGS.nSamples, indices = None)
+
+    #TODO take care of transformation
+
+    train_data = data.getDataLoader_train(batch_size = FLAGS.bs, transform = None, nWorkers = FLAGS.nw)
+    trainLoaderA, trainLoaderB, bsz = train_data
+    ## Sample trainloader can be specified as before, we don't care if each GPU holds a copy of sampled data (also test dataloader in case we use it)
+    trainA_samples, trainB_samples, testA_samples, testB_samples = data.getDataLoader_samples(transform_train = None, transform_test = None, nWorkers = FLAGS.nw)
+
+    """
+    Define model
+    """
+    last_epoch = -1
+    model = cycleGAN(FLAGS)
+    if FLAGS.resume:
+        last_epoch = model.load(path_checkpoint)
+        if not last_epoch == FLAGS.last_epoch:
+            raise RuntimeError('DEBUG: Inconsistency between the saved last epoch and specified last epoch')
+    else:
+        model.sync_init(num_nodes)
+
+
+    """
+    Training
+    """
+    for epoch in range(last_epoch+1, FLAGS.nEpoch):
+
+        ##### BW specific command for ADAM opt #######
+        for group in model.optimizerD.param_groups:
+            for p in group['params']:
+                state = model.optimizerD.state[p]
+                if('step' in state and state['step']>=1024):
+                    state['step'] = 1000
+
+        for group in model.optimizerG.param_groups:
+            for p in group['params']:
+                state = model.optimizerG.state[p]
+                if('step' in state and state['step']>=1024):
+                    state['step'] = 1000
+        ################################################
+
+
+        #NOTE: I think iterator on dataloader by default returns a list where first element is data and second is its label
+        # but here we don't have label, therefore we only need the first element, so index '0' was used
+        batchID = 1
+        for A, B in zip(trainLoaderA, trainLoaderB):
+            input = (A[0],B[0])
+            model.update_optimizer(input, num_nodes)
+            if batchID % 100 == 0 and rank == 0:
+                model.print_loss(epoch)
+            batchID += 1
+
+        """
+        Save and Evaluation
+        """
+        if (epoch + 1) % FLAGS.freq == 0 and rank == 0:
+            model.save(FLAGS.checkpoint_dir, epoch)
+
+            for sampledA, sampledB in zip(trainA_samples, trainB_samples):
+                path_write = FLAGS.image_dir + '/train'
+                model.evaluate(sampledA[0], sampledB[0], path_write, epoch)
+
+            for sampledA, sampledB in zip(testA_samples, testB_samples):
+                path_write = FLAGS.image_dir + '/test'
+                model.evaluate(sampledA[0], sampledB[0], path_write, epoch)
+
+        """
+        Update learning rate
+        """
+        newLR = calculate_lr(FLAGS.lr, FLAGS.steps_constLR, FLAGS.nEpoch - FLAGS.steps_constLR, FLAGS.nEpoch, epoch)
+        model.update_lr(newLR_G = newLR, newLR_D = newLR)
+
+if __name__ == "__main__":
+    app.run(main)

@@ -1,5 +1,5 @@
 """
-@author: Payam Dibaeinia, and {add your names}
+@author: Payam Dibaeinia
 """
 
 from absl import flags
@@ -24,7 +24,7 @@ flags.DEFINE_integer('nbl', 9, 'Number of residual blocks in the generators')
 flags.DEFINE_integer('ncFirstConv', 64, 'Number of channels in the first convolution layer of generators')
 flags.DEFINE_boolean('dropout', False, 'Whether use dropout in the residual blocks')
 flags.DEFINE_float('lr', 0.0002, 'Initial learning rate')
-flags.DEFINE_string('ds', None, 'Name of the dataset: horse2zebra, apple2orange, summer2winter_yosemite')
+flags.DEFINE_string('ds', None, 'Name of the dataset: horse2zebra, apple2orange, summer2winter_yosemite, cezanne2photo, monet2photo, ukiyoe2photo, vangogh2photo')
 flags.DEFINE_string('data_dir', 'data', 'Directory of data')
 flags.DEFINE_string('checkpoint_dir', 'models', 'Directory of saved checkpoints during training')
 flags.DEFINE_string('image_dir', 'generated_images', 'Directory of generated images during training')
