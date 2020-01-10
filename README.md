@@ -6,4 +6,7 @@ I used this model for object transfiguration (horse <-> zebra), artistic style t
 
 ### Horse <-> Zebra
 <p align="center"><img src="Images/h2z_train.png" width = "700" class="center"></p>
+<p align="center"><img src="Images/h2z_test.png" width = "700" class="center"></p>
+<p align="center"><img src="Images/z2h_train.png" width = "700" class="center"></p>
+<p align="center"><img src="Images/z2h_test.png" width = "700" class="center"></p>
 
