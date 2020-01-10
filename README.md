@@ -5,5 +5,5 @@ Re-implementation of the CycleGAN model proposed by Zhu et al. (See it [here](ht
 I used this model for object transfiguration (horse <-> zebra), artistic style transfer (Monet & Cezzane painting <-> real photo), and season transfer (summer <-> winter). Here are some of the results:
 
 ### Horse <-> Zebra
-<img src="Images/h2z_train.png" width = "800">
+<img src="Images/h2z_train.png" width = "700">
 
