@@ -22,16 +22,16 @@ I used this model for object transfiguration (horse <-> zebra), artistic style t
 ## Train CycleGAN
 Run the following command to see a full description of the input flags:
 
-'''console
+```console
 python train.py --help
-'''
+```
 Example: To train a CycleGAN model on horse-to-zebra data set for 200 epochs,
 without the identity loss, and without multiprocessing in data loading, run the
 following:
 
-'''console
+```console
 python train.py --l_idnt 0 --ds horse2zebra --nEpoch 200 --nw 0 > out.log
-'''
+```
 
 Running the above command creates the following three folders:
   1- data: contains the specified data set
@@ -41,8 +41,8 @@ Running the above command creates the following three folders:
 In order to continue training from a saved model (e.g. the model saved after
 epoch 49), run the following command:
 
-'''console
+```console
 python train.py --l_idnt 0 --ds horse2zebra --nEpoch 200 --nw 0 --resume True --last_epoch 49 > out.log
-'''
+```
 
 Training will be continued while last_epoch < nEpoch.
